@@ -1,5 +1,6 @@
 .venv/
-.env
-export_env.sh
 __pycache__/
 *.py[cod]
+.env
+export_env.sh
+
