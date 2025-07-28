@@ -1,4 +1,3 @@
-"""Data models for conversation and call management."""
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Dict, List, Any, Optional

@@ -1,4 +1,3 @@
-"""Speech recognition and text-to-speech services."""
 import speech_recognition as sr
 from elevenlabs import ElevenLabs, VoiceSettings
 from io import BytesIO

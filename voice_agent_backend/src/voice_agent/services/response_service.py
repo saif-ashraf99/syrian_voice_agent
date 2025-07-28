@@ -1,4 +1,3 @@
-"""Response generation service using AI models."""
 import openai
 from typing import List, Dict, Any
 
