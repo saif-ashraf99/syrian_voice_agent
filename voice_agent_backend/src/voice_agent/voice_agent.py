@@ -1,5 +1,6 @@
-"""Main VoiceAgent class that orchestrates all services."""
 from typing import Optional, Dict, Any
+
+from twilio.twiml.voice_response import VoiceResponse
 
 from .services.speech_service import SpeechRecognitionService, TextToSpeechService
 from .services.intent_service import IntentDetectionService
@@ -117,9 +118,25 @@ class VoiceAgent:
             }
     
     def create_welcome_response(self) -> str:
-        """Create welcome response for incoming calls."""
-        welcome_message = "أهلاً وسهلاً بك في مطعم شاركو تشيكن. كيف ممكن ساعدك اليوم؟"
-        return self.twilio_service.create_welcome_response(welcome_message)
+        """Speak a welcome message in Egyptian Arabic, then record."""
+        welcome = "أهلاً وسهلاً بك في مطعم شاركو تشيكن. كيف ممكن أساعدك اليوم؟"
+        resp = VoiceResponse()
+        # Use Polly.Zeina for Arabic, and EG locale
+        resp.say(welcome, voice="Polly.Zeina", language="ar-EG")
+        # brief pause so the prompt isn't cut off
+        resp.pause(length=1)
+        # record the caller’s response (with beep)
+        resp.record(
+            action="/api/voice_agent/process_recording",
+            method="POST",
+            max_length=30,
+            finish_on_key="#",
+            play_beep=True,
+            transcribe=True,
+            transcribe_callback="/api/voice_agent/transcription"
+        )
+        return str(resp)
+
     
     def create_processing_response(self) -> str:
         """Create processing response."""

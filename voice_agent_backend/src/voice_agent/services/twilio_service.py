@@ -1,8 +1,11 @@
-"""Twilio integration service for voice calls."""
 from twilio.rest import Client
 from twilio.twiml.voice_response import VoiceResponse
-from typing import Optional
 
+from typing import Optional
+import uuid
+import os
+
+from ..services.speech_service import TextToSpeechService
 from ..config.settings import config
 from ..utils.logger import logger
 
@@ -16,37 +19,57 @@ class TwilioService:
         
         self.client = Client(config.twilio.account_sid, config.twilio.auth_token)
     
-    def create_welcome_response(self, welcome_message: str) -> str:
+    def create_welcome_response(
+        self,
+        welcome_message: str,
+        eleven_voice_id: str = None
+    ) -> str:
         """
-        Create a TwiML response with welcome message and recording setup.
-        
-        Args:
-            welcome_message: Message to speak to caller
-            
-        Returns:
-            TwiML response as string
+        Generate an ElevenLabs MP3 for the greeting, then <Play> it,
+        <Gather> the response, and fallback/redirect if necessary.
         """
-        response = VoiceResponse()
-        
-        # Say welcome message
-        response.say(
-            welcome_message,
-            voice='alice',
-            language='ar'
+        tts_service = TextToSpeechService()
+        buffer = tts_service.generate_speech(
+            text=welcome_message,
+            save_to_bytes=True,
+            voice_id=eleven_voice_id
         )
-        
-        # Set up recording
-        response.record(
-            action='/api/voice_agent/process_recording',
-            method='POST',
-            max_length=config.max_recording_length,
-            finish_on_key='#',
-            transcribe=True,
-            transcribe_callback='/api/voice_agent/transcription'
+
+        resp = VoiceResponse()
+
+        # 1. Play your ElevenLabs greeting (or fallback to Polly)
+        if buffer:
+            file_id = str(uuid.uuid4())
+            path = os.path.join(config.app.tts_cache_dir, f"{file_id}.mp3")
+            with open(path, "wb") as f:
+                f.write(buffer.getvalue())
+            play_url = f"{config.app.base_url}/api/voice_agent/tts/{file_id}.mp3"
+            resp.play(play_url)
+        else:
+            resp.say(welcome_message, voice="Polly.Zeina", language="ar-EG")
+
+        # 2. Gather live speech and POST it back
+        gather_url = f"{config.app.base_url}/api/voice_agent/process_speech"
+        resp.gather(
+            input="speech",
+            language="ar-EG",
+            action=gather_url,
+            method="POST",
+            timeout=5
         )
-        
-        return str(response)
-    
+
+        # 3. Fallback if no speech was captured
+        resp.say(
+            "لم أسمعك، من فضلك حاول مرة أخرى.",
+            voice="Polly.Zeina",
+            language="ar-EG"
+        )
+        # 4. Redirect back to this same webhook to replay greeting+gather
+        webhook_url = f"{config.app.base_url}/api/voice_agent/webhook/voice"
+        resp.redirect(webhook_url, method="POST")
+
+        return str(resp)
+
     def create_processing_response(self, message: str) -> str:
         """
         Create a TwiML response for processing state.
@@ -81,38 +104,51 @@ class TwilioService:
         response.hangup()
         return str(response)
     
-    def create_agent_response(self, agent_message: str, continue_call: bool = True) -> str:
+    def create_agent_response(
+        self,
+        agent_message: str,
+        continue_call: bool = True,
+        eleven_voice_id: str = None
+    ) -> str:
         """
-        Create a TwiML response with agent message.
-        
-        Args:
-            agent_message: Message from the agent
-            continue_call: Whether to continue the call or hang up
-            
-        Returns:
-            TwiML response as string
+        Generate TTS via ElevenLabs and return TwiML that <Play>’s it.
         """
-        response = VoiceResponse()
-        response.say(
-            agent_message,
-            voice='alice',
-            language='ar'
+        # 1. Generate MP3 from ElevenLabs
+        tts_service = TextToSpeechService()
+        buffer = tts_service.generate_speech(
+            text=agent_message,
+            save_to_bytes=True,
+            voice_id=eleven_voice_id
         )
-        
+        if not buffer:
+            # Fallback to Polly
+            resp = VoiceResponse()
+            resp.say(agent_message, voice="Polly.Zeina", language="ar-EG")
+        else:
+            # 2. Write buffer to a unique file
+            file_id = str(uuid.uuid4())
+            path = os.path.join(config.app.tts_cache_dir, f"{file_id}.mp3")
+            with open(path, "wb") as f:
+                f.write(buffer.read())
+
+            # 3. Build TwiML that <Play>s it
+            tts_url = f"{config.app.base_url}/api/voice_agent/tts/{file_id}.mp3"
+            resp = VoiceResponse()
+            resp.play(tts_url)
+
+        # 4. Continue or hang up
         if continue_call:
-            # Continue conversation - record next response
-            response.record(
-                action='/api/voice_agent/process_recording',
-                method='POST',
-                max_length=config.max_recording_length,
-                finish_on_key='#',
-                transcribe=True,
-                transcribe_callback='/api/voice_agent/transcription'
+            resp.gather(
+                input="speech",
+                language="ar-EG",
+                action="/api/voice_agent/process_speech",
+                method="POST",
+                timeout=5
             )
         else:
-            response.hangup()
-        
-        return str(response)
+            resp.hangup()
+
+        return str(resp)
     
     def make_outbound_call(
         self, 

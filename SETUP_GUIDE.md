@@ -76,6 +76,9 @@ pip install -r requirements.txt
    # ElevenLabs Configuration
    ELEVENLABS_API_KEY=your_elevenlabs_key_here
 
+   # Your Application URL [Ngrok or Custom Domain]
+   APP_BASE_URL=
+
    # Application Settings
    FLASK_ENV=development
    DEBUG=True

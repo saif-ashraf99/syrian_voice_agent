@@ -71,10 +71,11 @@ This project implements a sophisticated voice agent specifically designed for Ch
    Create a `.env` file in the backend directory:
 
    ```env
-    TWILIO_ACCOUNT_SID=your_twilio_account_sid
+   TWILIO_ACCOUNT_SID=your_twilio_account_sid
    TWILIO_AUTH_TOKEN=your_twilio_auth_token
    ELEVENLABS_API_KEY=your_elevenlabs_api_key
    OPENAI_API_KEY=your_openai_api_key (Google Gemma)
+   APP_BASE_URL=Your Application URL [Ngrok or Custom Domain]
    ```
 3. **Start the Backend**
 
@@ -355,6 +356,8 @@ TWILIO_AUTH_TOKEN=your_auth_token
 # AI Services
 OPENAI_API_KEY=your_openai_key (Google Gemma)
 ELEVENLABS_API_KEY=your_elevenlabs_key
+
+APP_BASE_URL=Your Application URL [Ngrok or Custom Domain]
  
 # Application Settings
 FLASK_ENV=production

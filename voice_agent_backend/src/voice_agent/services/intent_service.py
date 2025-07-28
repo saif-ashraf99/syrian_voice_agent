@@ -1,7 +1,5 @@
-"""Intent detection service using OpenAI/Gemma models."""
 import json
 import openai
-from typing import Dict, Any
 
 from ..config.settings import config
 from ..models.conversation import IntentData
